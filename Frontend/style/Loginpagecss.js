@@ -1,0 +1,108 @@
+import { StyleSheet } from 'react-native';
+
+export default StyleSheet.create({
+    container: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#f2f2f2',
+        padding: 20,
+    },
+    inputFocused: {
+        borderColor: '#007bff',
+        backgroundColor: '#fff',
+        shadowColor: '#007bff',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
+    },
+
+    formBox: {
+        width: '100%',
+        maxWidth: 400,
+        backgroundColor: '#fff',
+        padding: 20,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#ddd',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 5,
+        elevation: 5,
+    },
+    heading: {
+        fontSize: 26,
+        fontWeight: 'bold',
+        marginBottom: 24,
+        textAlign: 'center',
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: '#ccc',
+        padding: 12,
+        marginBottom: 12,
+        borderRadius: 8,
+        backgroundColor: '#fff',
+    },
+    emailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    smallButton: {
+        backgroundColor: '#007bff',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+    },
+    smallButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    button: {
+        backgroundColor: '#007bff',
+        padding: 14,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    buttonText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 18,
+    },
+    orText: {
+        textAlign: 'center',
+        marginVertical: 16,
+        color: '#999',
+    },
+    googleButton: {
+        backgroundColor: '#ffffff',
+        borderRadius: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginVertical: 10,
+    },
+    googleButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    googleLogo: {
+        width: 30,
+        height: 30,
+        marginRight: 10,
+        resizeMode: 'contain',
+    },
+    googleButtonText: {
+        color: '#000000',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+});
