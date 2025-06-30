@@ -1,12 +1,14 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, Image } from 'react-native';
-import { useNavigation } from '@react-navigation/native';  
+import { View, Animated } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import styles from '../style/Entrypagecss';
+import { useTheme } from '../ThemeContext'
 
 const Entrypage = () => {
-  const navigation = useNavigation(); 
-
-  const scaleAnim = useRef(new Animated.Value(1.5)).current; 
+  const navigation = useNavigation();
+  const { colors } = useTheme();
+  const scaleAnim = useRef(new Animated.Value(1.5)).current;
 
   useEffect(() => {
     Animated.timing(scaleAnim, {
@@ -15,23 +17,28 @@ const Entrypage = () => {
       useNativeDriver: true,
     }).start();
 
-    const timer = setTimeout(() => {
-      navigation.replace('Login'); 
-    }, 3000);
+    const checkLoginStatus = async () => {
+      const isLoggedIn = await AsyncStorage.getItem('isLoggedIn');
+      const hasUsedAppBefore = await AsyncStorage.getItem('hasUsedAppBefore');
 
-    return () => clearTimeout(timer);
-  }, [navigation]);
+      setTimeout(async () => {
+        if (isLoggedIn === 'true' || hasUsedAppBefore === 'true') {
+          navigation.replace('Home');
+        } else {
+          navigation.replace('Login');
+          await AsyncStorage.setItem('hasUsedAppBefore', 'true');
+        }
+      }, 3000);
+    };
+
+    checkLoginStatus();
+  }, []);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <Animated.Image
         source={require('../assests/localchat_logo.png')}
-        style={[
-          styles.titleImage,
-          {
-            transform: [{ scale: scaleAnim }],
-          },
-        ]}
+        style={[styles.titleImage, { transform: [{ scale: scaleAnim }] }]}
       />
     </View>
   );

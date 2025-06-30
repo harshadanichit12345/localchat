@@ -1,27 +1,54 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, Image } from 'react-native';
-import styles from '../style/Loginpagecss';
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  Image,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import FCMService from '../services/FCMServices';
+import { useTheme } from '../ThemeContext';
+import { makeLoginStyles } from '../style/Loginpagecss';
 
 const LoginScreen = () => {
+  const navigation = useNavigation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeLoginStyles(colors), [colors]);
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
   const [phone, setPhone] = useState('');
-  const navigation = useNavigation();
   const [focusedField, setFocusedField] = useState('');
 
   useEffect(() => {
-    const checkLoginStatus = async () => {
-      const loggedIn = await AsyncStorage.getItem('isLoggedIn');
-      const storedEmail = await AsyncStorage.getItem('email');
-      if (loggedIn === 'true' && storedEmail) {
-        navigation.replace('Home'); 
+    const loadUserName = async () => {
+      const storedName = await AsyncStorage.getItem('fullName');
+      if (storedName) {
+        setName(storedName);
       }
     };
-    checkLoginStatus();
+    loadUserName();
   }, []);
+
+  const setupFCM = async () => {
+    const permissionGranted = await FCMService.requestPermission();
+    if (permissionGranted) {
+      const token = await FCMService.getToken();
+      if (token) {
+        await fetch('https://eb6e-2409-4081-1104-eb7e-8c88-f8ea-3637-3fda.ngrok-free.app/api/save-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+      }
+      FCMService.listenForMessages();
+    }
+  };
 
   const handleSendOtp = async () => {
     if (!name || !email || !phone) {
@@ -30,18 +57,24 @@ const LoginScreen = () => {
     }
 
     try {
-      const response = await fetch('http://10.0.2.2:5000/api/send-otp', {
+      const response = await fetch('https://eb6e-2409-4081-1104-eb7e-8c88-f8ea-3637-3fda.ngrok-free.app/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullname: name, email, phone }), 
+        body: JSON.stringify({ fullname: name, email, phone }),
       });
 
-      const data = await response.json();
-      if (response.ok) {
-        setOtpSent(true);
-        Alert.alert('OTP sent successfully to your email.');
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        const data = await response.json();
+        if (response.ok) {
+          setOtpSent(true);
+          Alert.alert('OTP sent successfully to your email.');
+        } else {
+          Alert.alert(data.message || 'Failed to send OTP.');
+        }
       } else {
-        Alert.alert(data.message || 'Failed to send OTP.');
+        const text = await response.text();
+        Alert.alert('Unexpected response: ' + text);
       }
     } catch (error) {
       Alert.alert('Error', error.message);
@@ -60,17 +93,40 @@ const LoginScreen = () => {
     }
 
     try {
-      const response = await fetch('http://10.0.2.2:5000/api/verify-otp', {
+      const permissionGranted = await FCMService.requestPermission();
+      let fcmToken = null;
+
+      if (permissionGranted) {
+        fcmToken = await FCMService.getToken();
+        FCMService.listenForMessages();
+      }
+
+      const response = await fetch('https://eb6e-2409-4081-1104-eb7e-8c88-f8ea-3637-3fda.ngrok-free.app/api/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp }), 
+        body: JSON.stringify({ email, otp, fcmToken }),
       });
 
-      const data = await response.json();
-      if (response.ok) {
-        navigation.navigate('Home');
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        const data = await response.json();
+
+        if (response.ok) {
+          await AsyncStorage.multiSet([
+            ['isLoggedIn', 'true'],
+            ['email', email],
+            ['fullName', name],
+            ['loggedInUser', email],
+            ['fcmToken', fcmToken || ''],
+          ]);
+          await setupFCM();
+          navigation.navigate('Home');
+        } else {
+          Alert.alert(data.message || 'OTP verification failed.');
+        }
       } else {
-        Alert.alert(data.message || 'OTP verification failed.');
+        const text = await response.text();
+        Alert.alert('Unexpected response: ' + text);
       }
     } catch (error) {
       Alert.alert('Error', error.message);
@@ -89,6 +145,7 @@ const LoginScreen = () => {
         <TextInput
           style={[styles.input, focusedField === 'name' && styles.inputFocused]}
           placeholder="Name"
+          placeholderTextColor={colors.text}
           value={name}
           onChangeText={setName}
           onFocus={() => setFocusedField('name')}
@@ -99,10 +156,11 @@ const LoginScreen = () => {
           <TextInput
             style={[
               styles.input,
-              focusedField === 'email' && styles.inputFocused,
               { flex: 1, marginRight: 8 },
+              focusedField === 'email' && styles.inputFocused,
             ]}
             placeholder="Email ID"
+            placeholderTextColor={colors.text}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -118,6 +176,7 @@ const LoginScreen = () => {
           <TextInput
             style={[styles.input, focusedField === 'otp' && styles.inputFocused]}
             placeholder="Enter OTP"
+            placeholderTextColor={colors.text}
             value={otp}
             onChangeText={setOtp}
             keyboardType="number-pad"
@@ -129,6 +188,7 @@ const LoginScreen = () => {
         <TextInput
           style={[styles.input, focusedField === 'phone' && styles.inputFocused]}
           placeholder="Phone Number"
+          placeholderTextColor={colors.text}
           value={phone}
           onChangeText={setPhone}
           keyboardType="phone-pad"

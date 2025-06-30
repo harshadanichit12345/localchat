@@ -1,130 +1,85 @@
-import React, { useState, useContext } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  StyleSheet,
-  StatusBar,
-} from 'react-native';
-import FontAwesome from 'react-native-vector-icons/FontAwesome';
-import { useNavigation } from '@react-navigation/native';
-import { ThemeContext } from '../context/ThemeContext';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useTheme } from '../ThemeContext';
 
-const Setting = () => {
-  const navigation = useNavigation();
-  const [modalVisible, setModalVisible] = useState(false);
-  const { isDark, theme, changeTheme } = useContext(ThemeContext);
+const options = [
+  { label: 'System Default', value: 'system' },
+  { label: 'Light Theme', value: 'light' },
+  { label: 'Dark Theme', value: 'dark' },
+];
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: isDark ? '#000' : '#fff',
-      paddingTop: 50,
-      alignItems: 'center',
-    },
-    backIconuser: {
-      position: 'absolute',
-      top: 40,
-      left: 20,
-    },
-    themeText: {
-      fontSize: 18,
-      color: isDark ? '#00aced' : '#007aff',
-      marginTop: 100,
-    },
-    modalContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      backgroundColor: 'rgba(0,0,0,0.6)',
-      padding: 20,
-    },
-    modalContent: {
-      backgroundColor: isDark ? '#333' : '#fff',
-      padding: 20,
-      borderRadius: 10,
-    },
-    option: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 10,
-    },
-    radioOuter: {
-      height: 20,
-      width: 20,
-      borderRadius: 10,
-      borderWidth: 2,
-      borderColor: '#888',
-      marginRight: 10,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    radioInner: {
-      height: 10,
-      width: 10,
-      borderRadius: 5,
-      backgroundColor: '#007aff',
-    },
-    optionText: {
-      fontSize: 16,
-      color: isDark ? '#fff' : '#000',
-      textTransform: 'capitalize',
-    },
-    cancelText: {
-      alignSelf: 'flex-end',
-      marginTop: 10,
-      color: '#007aff',
-    },
-  });
-
-  const handleThemeChange = (value) => {
-    changeTheme(value);
-    setModalVisible(false);
-  };
+export default function Setting({ navigation }) {
+  const { mode, setMode, colors } = useTheme();
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
+      </View>
 
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backIconuser}>
-        <FontAwesome name="arrow-left" size={20} color={isDark ? '#fff' : '#000'} />
-      </TouchableOpacity>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Theme</Text>
 
-      <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.themeButton}>
-        <FontAwesome name="adjust" size={20} color={isDark ? '#00aced' : '#007aff'} style={{ marginRight: 8 }} />
-        <Text style={styles.themeText}>Theme</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.activeThemeText}>
-        Current: {theme.charAt(0).toUpperCase() + theme.slice(1)} Theme
-      </Text>
-
-      <Modal transparent visible={modalVisible} animationType="fade">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={[styles.optionText, { marginBottom: 10 }]}>Choose Theme</Text>
-
-            {['system', 'light', 'dark'].map((option) => (
-              <TouchableOpacity
-                key={option}
-                style={styles.option}
-                onPress={() => handleThemeChange(option)}
-              >
-                <View style={styles.radioOuter}>
-                  {theme === option && <View style={styles.radioInner} />}
-                </View>
-                <Text style={styles.optionText}>{option}</Text>
-              </TouchableOpacity>
-            ))}
-
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
+      {options.map(({ label, value }) => (
+        <TouchableOpacity
+          key={value}
+          style={styles.radioButton}
+          activeOpacity={0.7}
+          onPress={() => setMode(value)}
+        >
+          <View style={[styles.radioCircle, { borderColor: colors.text }]}>
+            {mode === value && <View style={[styles.radioDot, { backgroundColor: colors.text }]} />}
           </View>
-        </View>
-      </Modal>
+          <Text style={[styles.radioLabel, { color: colors.text }]}>{label}</Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
-};
+}
 
-export default Setting;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 32
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginLeft: 10
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 20
+  },
+  radioButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18
+  },
+  radioCircle: {
+    height: 22,
+    width: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12
+  },
+  radioDot: {
+    height: 10,
+    width: 10,
+    borderRadius: 5
+  },
+  radioLabel: {
+    fontSize: 16
+  },
+});

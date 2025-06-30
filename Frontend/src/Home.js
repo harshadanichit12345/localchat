@@ -1,190 +1,122 @@
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  FlatList,
-  Modal,
-  Alert,
-} from 'react-native';
-import React, { useState, useEffect } from 'react';
-import styles from '../style/Homepagecss';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, TouchableOpacity, TextInput, FlatList, Alert } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import firestore from '@react-native-firebase/firestore';
 import axios from 'axios';
+import { useTheme } from '../ThemeContext';
+import { makeHomeStyles } from '../style/Homepagecss';
 
-const Home = () => {
+export default function Home() {
   const navigation = useNavigation();
-  const [StorageMessage, setStorageMessage] = useState('');
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeHomeStyles(colors), [colors]);
   const [messages, setMessages] = useState([]);
-  const [selectedMsgId, setSelectedMsgId] = useState(null);
   const [inputText, setInputText] = useState('');
-  const [pendingMessage, setPendingMessage] = useState('');
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const [currentUser, setCurrentUser] = useState('');
+  const [storageKey, setStorageKey] = useState('');
+  const [selectedMsgId, setSelectedMsg] = useState(null);
+  const [notificationCount, setNotif] = useState(0);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    const init = async () => {
-      const user = await AsyncStorage.getItem('loggedInUser');
-      if (!user) return;
-
-      setCurrentUser(user);
-      const storageKey = `ChatMessage_${user}`;
-      setStorageMessage(storageKey);
-
-      await AsyncStorage.removeItem(storageKey);
-      setMessages([]);
-      await AsyncStorage.setItem(storageKey, JSON.stringify([]));
-
-      const subscribed = await AsyncStorage.getItem(`subscribed_${user}`);
-      setIsSubscribed(subscribed === 'true');
-
-      console.log('Previous chat cleared on login');
-    };
-    init();
+    (async () => {
+      const email = await AsyncStorage.getItem('email');
+      if (!email) return;
+      const normalized = email.trim().toLowerCase();
+      setCurrentUser(normalized);
+      setStorageKey(`ChatMessage_${normalized}`);
+    })();
   }, []);
 
   useEffect(() => {
-    if (!StorageMessage) return;
+    if (!currentUser) return;
 
-    const interval = setInterval(async () => {
-      const stored = await AsyncStorage.getItem(StorageMessage);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const now = Date.now();
-        const filtered = parsed.filter(
-          msg => now - (msg.timestamp || 0) <= 3 * 60 * 60 * 1000
-        );
-        setMessages(filtered);
-        await AsyncStorage.setItem(StorageMessage, JSON.stringify(filtered));
+    const fetchMessages = async () => {
+      const sent = await firestore().collection('chats').where('senderId', '==', currentUser).get();
+      const received = await firestore().collection('chats').where('receiverId', '==', currentUser).get();
+
+      const map = (doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          text: data.message,
+          sender: data.senderId,
+          receiver: data.receiverId,
+          timestamp: data.timestamp.toMillis(),
+          time: new Date(data.timestamp.toMillis()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          date: new Date(data.timestamp.toMillis()).toDateString(),
+          reaction: data.reaction || null,
+        };
+      };
+
+      const combined = [...sent.docs.map(map), ...received.docs.map(map)].sort((a, b) => b.timestamp - a.timestamp);
+      const local = await AsyncStorage.getItem(storageKey);
+      if (local) {
+        const localMsgs = JSON.parse(local);
+        combined.forEach((msg) => {
+          const stored = localMsgs.find(m => m.id === msg.id);
+          if (stored && stored.reaction) msg.reaction = stored.reaction;
+        });
       }
-    }, 10000);
 
-    return () => clearInterval(interval);
-  }, [StorageMessage]);
-
-  const saveMessages = async (msgs) => {
-    if (StorageMessage) {
-      await AsyncStorage.setItem(StorageMessage, JSON.stringify(msgs));
-    }
-  };
-
-  const handleSendMessage = async () => {
-    const trimmedMessage = inputText.trim();
-
-    if (!trimmedMessage) {
-      Alert.alert('Validation', 'Message cannot be empty.');
-      return;
-    }
-
-    if (messages.length === 0 || !isSubscribed) {
-      setPendingMessage(trimmedMessage);
-      setShowSubscribeModal(true);
-      setInputText('');
-      return;
-    }
-
-    sendMessage(trimmedMessage);
-  };
-
-  const sendMessage = async (messageToSend) => {
-    const now = Date.now();
-    const newMessage = {
-      id: now.toString(),
-      text: messageToSend,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      date: new Date().toDateString(),
-      timestamp: now,
-      sender: currentUser,
+      setMessages(combined);
+      await AsyncStorage.setItem(storageKey, JSON.stringify(combined));
     };
 
-    try {
-      await axios.post('http://10.0.2.2:5000/api/send-message', {
-        senderId: currentUser,
-        message: messageToSend,
-      });
+    fetchMessages();
+    const id = setInterval(fetchMessages, 10000);
+    return () => clearInterval(id);
+  }, [currentUser, storageKey]);
 
-      const updatedMessages = [newMessage, ...messages];
-      setMessages(updatedMessages);
-      await saveMessages(updatedMessages);
-      setInputText('');
-    } catch (error) {
-      Alert.alert('Send Error', 'Message send failed. Please try again.');
-    }
-  };
-
-  const handleSubscribe = async () => {
-    try {
-      await axios.post(`http://10.0.2.2:5000/api/subscribe/${currentUser}`);
-
-      await AsyncStorage.setItem(`subscribed_${currentUser}`, 'true');
-      setIsSubscribed(true);
-      setShowSubscribeModal(false);
-
-      if (pendingMessage) {
-        sendMessage(pendingMessage);
-        setPendingMessage('');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to subscribe. Please try again.');
-    }
-  };
-
-  const handleLongPress = (id) => {
-    setSelectedMsgId(prevId => (prevId === id ? null : id));
-  };
-
-  const handleReaction = (id, reaction) => {
-    const updated = messages.map(msg => {
-      if (msg.id === id) return { ...msg, reaction };
-      return msg;
-    });
-    setMessages(updated);
-    saveMessages(updated);
-    setSelectedMsgId(null);
+  const react = async (id, reaction) => {
+    const updatedMessages = messages.map((msg) =>
+      msg.id === id ? { ...msg, reaction } : msg
+    );
+    setMessages(updatedMessages);
+    setSelectedMsg(null);
+    await AsyncStorage.setItem(storageKey, JSON.stringify(updatedMessages));
   };
 
   const renderItem = ({ item, index }) => {
-    const isLast = index === messages.length - 1;
-    const nextItem = messages[index + 1];
-    const showDate = isLast || item.date !== nextItem?.date;
-    const isSelected = selectedMsgId === item.id;
+    const showDate = index === messages.length - 1 || item.date !== messages[index + 1]?.date;
+    const mine = item.sender === currentUser;
+    const selected = selectedMsgId === item.id;
 
     return (
       <TouchableOpacity
-        onLongPress={() => handleLongPress(item.id)}
         activeOpacity={1}
+        onLongPress={() => setSelectedMsg(item.id)}
         style={{ marginBottom: 15 }}
       >
-        {showDate && (
-          <Text style={styles.dateHeader}>
-            {new Date(item.date).toDateString()}
-          </Text>
-        )}
+        {showDate && <Text style={styles.dateHeader}>{item.date}</Text>}
 
-        {isSelected && (
+        {selected && (
           <View style={styles.reactionIconContainer}>
-            <TouchableOpacity onPress={() => handleReaction(item.id, '👍')}>
+            <TouchableOpacity onPress={() => react(item.id, '👍')}>
               <Text style={styles.emoji}>👍</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleReaction(item.id, '👎')}>
+            <TouchableOpacity onPress={() => react(item.id, '👎')}>
               <Text style={styles.emoji}>👎</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        <View style={{ alignSelf: 'flex-end' }}>
+        <View style={{ alignSelf: mine ? 'flex-end' : 'flex-start' }}>
           <View style={[
-            styles.sentMessageBubble,
-            isSelected && styles.selectedMessageBubble,
+            mine ? styles.sentMessageBubble : styles.receivedMessageBubble,
+            selected && styles.selectedMessageBubble
           ]}>
-            <Text style={styles.messageText}>{item.text}</Text>
-            <Text style={styles.messageTime}>{item.time}</Text>
+            <Text style={[styles.messageText, { color: mine ? '#fff' : colors.text }]}>
+              {item.text}
+            </Text>
+            <Text style={[styles.messageTime, { color: mine ? '#fff' : colors.text }]}>
+              {item.time}
+            </Text>
           </View>
 
-          {item.reaction && !isSelected && (
+          {item.reaction && (
             <View style={styles.reactionBelowBubble}>
               <Text style={styles.emoji}>{item.reaction}</Text>
             </View>
@@ -194,24 +126,55 @@ const Home = () => {
     );
   };
 
+  const sendMessage = async () => {
+    if (sending || !inputText.trim()) return;
+
+    setSending(true); // 👈 Start lock
+    try {
+      const res = await axios.post(
+        'https://eb6e-2409-4081-1104-eb7e-8c88-f8ea-3637-3fda.ngrok-free.app/api/send-message',
+        {
+          senderId: currentUser,
+          message: inputText.trim(),
+        }
+      );
+
+      if (res.status === 200) {
+        setInputText('');
+      }
+    } catch (error) {
+      console.error('Message failed:', error);
+      Alert.alert('Message failed');
+    } finally {
+      setSending(false); 
+      
+    }
+  };
+
+
   return (
     <View style={styles.screen}>
       <View style={styles.homecontainer}>
         <Text style={styles.chat}>Chat</Text>
         <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="notifications-outline" size={30} />
+          <Ionicons name="notifications-outline" size={30} color={colors.text} />
+          {notificationCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationCount}>{notificationCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
-        <TouchableOpacity style={styles.menuicon} onPress={() => navigation.navigate('profile')}>
-          <Ionicons name="person-circle" size={35} />
+        <TouchableOpacity onPress={() => navigation.navigate('profile')}>
+          <Ionicons name="person-circle" size={35} color={colors.text} />
         </TouchableOpacity>
       </View>
 
       <FlatList
         data={messages}
+        inverted
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.messageList}
-        inverted
       />
 
       <View style={styles.searchBoxContainer}>
@@ -220,24 +183,12 @@ const Home = () => {
           placeholder="Ask anything"
           value={inputText}
           onChangeText={setInputText}
+          placeholderTextColor={colors.text}
         />
-        <TouchableOpacity style={styles.sendIcon} onPress={handleSendMessage}>
-          <Ionicons name="send" size={30} color="#007bff" />
+        <TouchableOpacity onPress={sendMessage}>
+          <Ionicons name="send" size={28} color="#007bff" />
         </TouchableOpacity>
       </View>
-
-      <Modal visible={showSubscribeModal} transparent animationType="slide">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Subscribe to Start Chatting</Text>
-            <TouchableOpacity onPress={handleSubscribe} style={styles.subscribeButton}>
-              <Text style={styles.subscribeButtonText}>Subscribe Now</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
-};
-
-export default Home;
+}
