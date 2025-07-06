@@ -15,7 +15,7 @@ const NavigationWrapper = () => {
 
   return (
     <NavigationContainer theme={navTheme}>
-      <Stack.Navigator initialRouteName="Entry" screenOptions={{ headerShown: false }}>
+      <Stack.Navigator initialRouteName="Entry" screenOptions={{ headerShown: false }}> 
         <Stack.Screen name="Entry" component={Entrypage} />
         <Stack.Screen name="Login" component={Loginpage} />
         <Stack.Screen name="setting" component={Setting}   />

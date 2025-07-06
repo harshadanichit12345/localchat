@@ -40,7 +40,7 @@ const LoginScreen = () => {
     if (permissionGranted) {
       const token = await FCMService.getToken();
       if (token) {
-        await fetch('https://eb6e-2409-4081-1104-eb7e-8c88-f8ea-3637-3fda.ngrok-free.app/api/save-token', {
+        await fetch('https://59e4-182-156-140-71.ngrok-free.app/api/save-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token }),
@@ -57,7 +57,7 @@ const LoginScreen = () => {
     }
 
     try {
-      const response = await fetch('https://eb6e-2409-4081-1104-eb7e-8c88-f8ea-3637-3fda.ngrok-free.app/api/send-otp', {
+      const response = await fetch('https://59e4-182-156-140-71.ngrok-free.app/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fullname: name, email, phone }),
@@ -101,7 +101,7 @@ const LoginScreen = () => {
         FCMService.listenForMessages();
       }
 
-      const response = await fetch('https://eb6e-2409-4081-1104-eb7e-8c88-f8ea-3637-3fda.ngrok-free.app/api/verify-otp', {
+      const response = await fetch('https://59e4-182-156-140-71.ngrok-free.app/api/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp, fcmToken }),

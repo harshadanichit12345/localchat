@@ -17,7 +17,6 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState('');
   const [storageKey, setStorageKey] = useState('');
   const [selectedMsgId, setSelectedMsg] = useState(null);
-  const [notificationCount, setNotif] = useState(0);
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
@@ -129,10 +128,10 @@ export default function Home() {
   const sendMessage = async () => {
     if (sending || !inputText.trim()) return;
 
-    setSending(true); // 👈 Start lock
+    setSending(true);
     try {
       const res = await axios.post(
-        'https://eb6e-2409-4081-1104-eb7e-8c88-f8ea-3637-3fda.ngrok-free.app/api/send-message',
+        'https://59e4-182-156-140-71.ngrok-free.app/api/send-message',
         {
           senderId: currentUser,
           message: inputText.trim(),
@@ -146,8 +145,7 @@ export default function Home() {
       console.error('Message failed:', error);
       Alert.alert('Message failed');
     } finally {
-      setSending(false); 
-      
+      setSending(false);
     }
   };
 
@@ -156,14 +154,6 @@ export default function Home() {
     <View style={styles.screen}>
       <View style={styles.homecontainer}>
         <Text style={styles.chat}>Chat</Text>
-        <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="notifications-outline" size={30} color={colors.text} />
-          {notificationCount > 0 && (
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationCount}>{notificationCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('profile')}>
           <Ionicons name="person-circle" size={35} color={colors.text} />
         </TouchableOpacity>
